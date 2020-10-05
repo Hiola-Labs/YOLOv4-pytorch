@@ -52,10 +52,12 @@ class Build_Dataset(Dataset):
             img_size = img.shape[1] # img must be square
         else:
             img_org, bboxes_org, img_name = self.__parse_annotation(self.__annotations[item])
+            img_org, bboxes_org = dataAug.Resize((self.img_size, self.img_size), True)(np.copy(img_org), np.copy(bboxes_org))
             img_org = img_org.transpose(2, 0, 1)
             img = img_org
             bboxes = bboxes_org
             img_size=512#magic, need fix
+            
 
         del img_org, bboxes_org
 

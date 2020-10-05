@@ -36,7 +36,7 @@ if __name__ == '__main__':
                                         shuffle=True, pin_memory=True
                                         )
     test_dataloader = DataLoader(test_dataset,
-                                        batch_size=1, #cfg.TRAIN["BATCH_SIZE"],
+                                        batch_size=cfg.TRAIN["BATCH_SIZE"],
                                         num_workers=cfg.VAL["NUMBER_WORKERS"],
                                         shuffle=False, pin_memory=True
                                         )

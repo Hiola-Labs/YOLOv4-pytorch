@@ -83,6 +83,7 @@ class lightenYOLOv4(pl.LightningModule):
 
 
     def validation_epoch_end(self, outputs):
+        print(outputs)
         APs = self.evaluator.calc_APs()
         mAP = 0
         for i in APs:
@@ -101,7 +102,10 @@ class lightenYOLOv4(pl.LightningModule):
             img = img.cpu().numpy().transpose(1, 2, 0)
             bboxes_prd = self.evaluator.get_bbox(img, multi_test=False, flip_test=False)
             self.evaluator.store_bbox(idx, bboxes_prd)
-        '''
+        
+        #img_batch = img_batch.cpu().numpy().transpose(0, 3, 2, 1)
+        #img_batch = torch.tensor(img_batch)
+        p, p_d = self(img_batch)
         loss, loss_ciou, loss_conf, loss_cls = self.criterion(p, p_d, label_sbbox, label_mbbox,
                                                   label_lbbox, sbboxes, mbboxes, lbboxes)
         
@@ -109,8 +113,8 @@ class lightenYOLOv4(pl.LightningModule):
         self.log('val_loss_conf', loss_conf)
         self.log('val_loss_cls', loss_cls)
         self.log('val_loss', loss)
-        '''
-        return 1
+
+        return loss
 
     def test_step(self, batch, batch_idx):
         img, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = batch
