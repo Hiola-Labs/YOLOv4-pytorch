@@ -26,7 +26,7 @@ from tqdm import tqdm
 from apex import amp
 
 class Trainer(object):
-    def __init__(self, testing_mode, weight_path, checkpoint_save_dir, resume, gpu_id, accumulate, fp_16, writer, logger, crx_fold_num):
+    def __init__(self, testing_mode, weight_path, checkpoint_save_dir, resume, gpu_id, accumulate, fp_16, writer, logger, crx_fold_num, train_batch_size, epochs):
         self.data_root = 'datasets/abus'
         init_seeds(0)
         self.device = gpu.select_device(gpu_id)
@@ -44,14 +44,19 @@ class Trainer(object):
         self.logger.info('augmentation=True, crx_fold_num= {}'.format(crx_fold_num))
         self.testing_mode = testing_mode
         self.crx_fold_num = crx_fold_num
+        if train_batch_size==0:
+            train_batch_size=cfg.TRAIN["BATCH_SIZE"]
+        self.train_batch_size=train_batch_size
         train_dataset = ABUSDetectionDataset(testing_mode, augmentation=True, crx_fold_num= crx_fold_num, crx_partition= 'train', crx_valid=True, include_fp=False, root=self.data_root,
-            batch_size=cfg.TRAIN["BATCH_SIZE"])
+            batch_size=train_batch_size)
         self.train_dataset = YOLO4_3DDataset(train_dataset, classes=[0, 1], img_size=cfg.TRAIN["TRAIN_IMG_SIZE"])
         #self.train_dataset = data.Build_Dataset(anno_file_type="train", img_size=cfg.TRAIN["TRAIN_IMG_SIZE"])
 
         self.epochs = cfg.TRAIN["YOLO_EPOCHS"] if cfg.MODEL_TYPE["TYPE"] == 'YOLOv4' else cfg.TRAIN["Mobilenet_YOLO_EPOCHS"]
+        if epochs>0:
+            self.epochs=epochs
         self.train_dataloader = DataLoader(self.train_dataset,
-                                           batch_size=1, #cfg.TRAIN["BATCH_SIZE"],
+                                           batch_size=1, #train_batch_size,
                                            num_workers=cfg.TRAIN["NUMBER_WORKERS"],
                                            shuffle=True, pin_memory=True
                                            )
@@ -118,7 +123,7 @@ class Trainer(object):
     def train(self):
         writer = self.writer
         logger = self.logger
-        logger.info("Training start,img size is: {},batchsize is: {:d},work number is {:d}".format(cfg.TRAIN["TRAIN_IMG_SIZE"],cfg.TRAIN["BATCH_SIZE"],cfg.TRAIN["NUMBER_WORKERS"]))
+        logger.info("Training start,img size is: {},batchsize is: {:d},work number is {:d}".format(cfg.TRAIN["TRAIN_IMG_SIZE"], self.train_batch_size, cfg.TRAIN["NUMBER_WORKERS"]))
         logger.info("Train datasets number is : {}".format(len(self.train_dataset)))
 
         if self.fp_16: self.model, self.optimizer = amp.initialize(self.model, self.optimizer, opt_level='O1', verbosity=0)
@@ -136,6 +141,19 @@ class Trainer(object):
                     label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = \
                         label_sbbox[0], label_mbbox[0], label_lbbox[0], sbboxes[0], mbboxes[0], lbboxes[0]
                     img_names = [_[0] for _ in img_names]
+                else:
+                    imgs = torch.transpose(imgs, 0, 1)[0].contiguous()
+
+                    label_sbbox = torch.transpose(label_sbbox, 0, 1)[0].contiguous()
+                    label_mbbox = torch.transpose(label_mbbox, 0, 1)[0].contiguous()
+                    label_lbbox = torch.transpose(label_lbbox, 0, 1)[0].contiguous()
+
+                    sbboxes = torch.transpose(sbboxes, 0, 1)[0].contiguous()
+                    mbboxes = torch.transpose(mbboxes, 0, 1)[0].contiguous()
+                    lbboxes = torch.transpose(lbboxes, 0, 1)[0].contiguous()
+
+                    img_names = img_names[0]
+
                 self.scheduler.step(len(self.train_dataloader)*epoch + i)
                 imgs = imgs.to(self.device)
                 label_sbbox = label_sbbox.to(self.device)
@@ -170,7 +188,7 @@ class Trainer(object):
                 if i % 10 == 0:
 
                     logger.info("  === Epoch:[{:3}/{}],step:[{:3}/{}],img_size:[{}],total_loss:{:.4f}|loss_ciou:{:.4f}|loss_conf:{:.4f}|loss_cls:{:.4f}|lr:{:.4f}|train_pr99:{:.4f}".format(
-                        epoch, self.epochs, i, len(self.train_dataloader) - 1, self.train_dataset.img_size,mloss[3], mloss[0], mloss[1],mloss[2],self.optimizer.param_groups[0]['lr'],
+                        epoch, self.epochs, i, len(self.train_dataloader) - 1, imgs.size(), mloss[3], mloss[0], mloss[1],mloss[2],self.optimizer.param_groups[0]['lr'],
                         mloss[4]
                     ))
                     if writer:
@@ -192,7 +210,21 @@ class Trainer(object):
 
             if epoch % 1==0: #tag:Val #20
                 if cfg.TRAIN["DATA_TYPE"] == 'VOC' or cfg.TRAIN["DATA_TYPE"] == 'ABUS':
-                    area_small, area_big, plt, pr999_p_conf = self.evaluate()
+                    exp_name = self.checkpoint_save_dir.split('/')[-1]
+                    if not os.path.exists('prediction'):
+                        os.mkdir('prediction')
+                    if not os.path.exists('prediction/{}'.format(exp_name)):
+                        os.mkdir('prediction/{}'.format(exp_name))
+                    if not os.path.exists('prediction/{}/{}'.format(exp_name, str(epoch))):
+                        os.mkdir('prediction/{}/{}'.format(exp_name, str(epoch)))
+                    if not os.path.exists('prediction/{}/{}'.format(exp_name, str(epoch))):
+                        os.mkdir('prediction/{}/{}'.format(exp_name, str(epoch)))
+
+                    pred_result_path='prediction/{}/{}/evaluate'.format(exp_name, str(epoch))
+
+                    if not os.path.exists(pred_result_path):
+                        os.mkdir(pred_result_path)
+                    area_small, area_big, plt, pr999_p_conf = self.evaluate(pred_result_path)
                     logger.info("===== Validate =====".format(epoch, self.epochs))
                     if writer:
                         writer.add_scalar('AUC_10mm', area_small, epoch)
@@ -208,7 +240,7 @@ class Trainer(object):
             logger.info("  ===cost time:{:.4f}s".format(end - start))
         logger.info("=====Training Finished.   best_test_mAP:{:.3f}%====".format(self.best_mAP))
 
-    def evaluate(self):
+    def evaluate(self, pred_result_path, skip_FROC=False):
         logger = self.logger
         logger.info("Evaluate start,img size is: {},batchsize is: {:d},work number is {:d}".format(cfg.VAL["TEST_IMG_SIZE"], cfg.VAL["BATCH_SIZE"], cfg.VAL["NUMBER_WORKERS"]))
         logger.info("Test datasets number is : {}".format(len(self.test_dataloader)))
@@ -218,7 +250,7 @@ class Trainer(object):
         start = time.time()
         self.model.eval()
         mloss = []
-        pred_result_path=os.path.join(self.checkpoint_save_dir, 'evaluate')
+        #pred_result_path=os.path.join(self.checkpoint_save_dir, 'evaluate')
         self.evaluator = Evaluator(self.model, showatt=False, pred_result_path=pred_result_path, box_top_k=256)
         self.evaluator.clear_predict_file()
         TOP_K = 50
@@ -312,8 +344,11 @@ class Trainer(object):
                         self.evaluator.store_bbox(img_name, bboxes_prd)
 
             print("Average time cost: {:.2f} sec.".format((time.time() - start_time)/len(self.test_dataloader)))
-            area_small, area_big, plt = calculate_FROC(self.data_root, npy_dir, npy_format, size_threshold=20, th_step=0.01)
-            plt.savefig(os.path.join(self.checkpoint_save_dir, 'froc_test.png'))
+            if skip_FROC:
+                area_small, area_big, plt = 0, 0, None
+            else:
+                area_small, area_big, plt = calculate_FROC(self.data_root, npy_dir, npy_format, size_threshold=20, th_step=0.01)
+                plt.savefig(os.path.join(self.checkpoint_save_dir, 'froc_test.png'))
 
         end = time.time()
         logger.info("  ===cost time:{:.4f}s".format(end - start))

@@ -4,6 +4,7 @@ import torch
 from torch.utils import data
 import logging
 from PIL import Image, ImageFont, ImageDraw
+import config.yolov4_config as cfg
 #from /home/lab402/bak/eason_thesis/program_update_v1/model.py
 def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
     '''Preprocess true boxes to training input format
@@ -124,9 +125,8 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
 
 def rand(a=0, b=1):
     return np.random.rand()*(b-a) + a
-def get_random_data(img_vol,annotation_line, input_shape, num_classes, random=True, max_boxes=10, jitter=.3, hue=.1, sat=1.5, val=1.5, proc_img=True, crop_scale=1.0):
+def get_random_data(img_vol,annotation_line, input_shape, num_classes, random=True, max_boxes=30, jitter=.3, hue=.1, sat=1.5, val=1.5, proc_img=True, crop_scale=1.0):
     '''random preprocessing for real-time data augmentation'''
-
 
     line = annotation_line.split(',', 4)
     # img_vol = np.load(line[0])
@@ -324,7 +324,6 @@ def get_random_data(img_vol,annotation_line, input_shape, num_classes, random=Tr
 
             # correct boxes
             if len(box) > 0:
-
                 if flip:
                     box[:, [0, 3]] = model_x - box[:, [3, 0]]  # Eason add flip
 
@@ -476,7 +475,7 @@ class AbusNpyFormat(data.Dataset):
         val_path = fold_list_root + 'five_fold_val_'+str(fold_num)+'_separate.txt'
         test_path = fold_list_root + 'five_fold_test_'+str(fold_num)+'.txt'
 
-        input_shape = (128, 128, 128) #(160,160,160)#(96, 96, 96)
+        input_shape = cfg.TRAIN["TRAIN_IMG_SIZE"]#(640, 160, 640) #(160,160,160)#(96, 96, 96)
         train_set = open(train_path).readlines()
         #train_set = [_.replace('/home/lab402/User/eason_thesis/ABUS_data/', '') for _ in train_set]
         #train_set = [root + '/converted_640_160_640/' + _.replace('/', '_') for _ in train_set]

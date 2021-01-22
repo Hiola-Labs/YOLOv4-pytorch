@@ -1,0 +1,6 @@
+
+
+export CUDA_VISIBLE_DEVICES=0 && python train3D.py --gpu_id=0 --exp_name=Fd0_BS1_CSP4_4_64_eason_crop_640anchorV1ax4TYNoAug --crx_valid=0 --batch_size=1 --stem_channels=4 --csp_first_channels=4
+export CUDA_VISIBLE_DEVICES=0 && python train3D.py --gpu_id=0 --exp_name=Fd1_BS1_CSP4_4_64_eason_crop_640anchorV1ax4TYNoAug --crx_valid=1 --batch_size=1 --stem_channels=4 --csp_first_channels=4
+export CUDA_VISIBLE_DEVICES=0 && python train3D.py --gpu_id=0 --exp_name=Fd4_BS1_CSP4_4_64_eason_crop_640anchorV1ax4TYNoAug --crx_valid=4 --batch_size=1 --stem_channels=4 --csp_first_channels=4
+

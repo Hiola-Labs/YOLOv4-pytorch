@@ -151,46 +151,22 @@ class CSPDarknet53(nn.Module):
     def __init__(self, in_channel, stem_channels=32, feature_channels=[64, 128, 256, 512, 1024], num_features=3,weight_path=None, resume=False, dims=2):
         super(CSPDarknet53, self).__init__()
 
-        #BS1
-        stem_channels = 4
-        channel_factor = 1/16 * 5
-
-        #for 1080 96 #for 96
-        #1080Ti
-        stem_channels = 4
-        channel_factor = 1/16 * 8
-
-        #for 1080 640 #for 640
-        #1080Ti
-        stem_channels = 2
-        channel_factor = 1/16 * 2 #like shit
-
-        #for 3090 640 #for 96
-        #BS2
-        #stem_channels = 4
-        #channel_factor = 1/16 * 4
-
-        #today and in those best day
-
-        #4_4_64
-        stem_channels = 4
-        channel_factor = 1/16 * 1
-
-        #4_8_128
-        #stem_channels = 4
-        #channel_factor = 1/16 * 2
-
-        #4_16_256
-        #stem_channels = 4
-        #channel_factor = 1/16 * 4
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--stem_channels', type=int, default=32)
+        parser.add_argument('--csp_first_channels', type=int, default=64)
+        opt = parser.parse_known_args()[0]
 
 
-
-
+        stem_channels = opt.stem_channels
+        channel_factor = opt.csp_first_channels / 64.
 
         feature_channels = [int(_ * (channel_factor)) for _ in feature_channels]
         self.stem_conv = Convolutional(in_channel, stem_channels, 3, dims=dims)
         #self.stem_conv = Convolutional(in_channel, stem_channels, kernel_size=7, stride=2, dims=dims)
+
+
+
 
         self.stages = nn.ModuleList([
             CSPFirstStage(stem_channels, feature_channels[0], dims=dims),

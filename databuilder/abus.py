@@ -49,6 +49,9 @@ class ABUSDetectionDataset(Dataset):
         #return_img = []
         return_anno = []
         return_id = []
+        max_len_anno = 0
+        for img, target in zip(imgs, targets):
+            max_len_anno = max(len(target), max_len_anno)
         for img, target in zip(imgs, targets):
             anno = []
             for item in target:
@@ -64,8 +67,8 @@ class ABUSDetectionDataset(Dataset):
             #data and notation in ZYXC shape
             #return_img.append((img.permute(1,2,3,0).float() / 255.0).numpy())
             #return_img.append(img.numpy())
-            if len(anno) < 10:
-                for i in range((10 - len(anno))):
+            if len(anno) < max_len_anno:
+                for i in range((max_len_anno - len(anno))):
                     anno.append([0, 0, 0, 0, 0, 0, 0, 0])
             return_anno.append(np.array(anno, dtype=np.float32))
             return_id.append(self.abusNpy.getID(index))

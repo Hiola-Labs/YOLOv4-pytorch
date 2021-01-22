@@ -38,7 +38,12 @@ if __name__ == "__main__":
     parser.add_argument('--fp_16', type=bool, default=False, help='whither to use fp16 precision')
     parser.add_argument('--exp_name', type=str, default='debug', help='log experiment name')
     parser.add_argument('--crx_valid', type=int, default=0)
-    opt = parser.parse_args()
+    parser.add_argument('--batch_size', type=int, default=0)
+    parser.add_argument('--epochs', type=int, default=0)
+    parser.add_argument('--stem_channels', type=int, default=32)
+    parser.add_argument('--csp_first_channels', type=int, default=64)
+
+    opt = parser.parse_known_args()[0]
     writer = SummaryWriter(log_dir=opt.log_path + '/' + opt.exp_name)
     logger = Logger(log_file_name=opt.log_path + '/' + opt.exp_name + '/log.txt', log_level=logging.DEBUG, logger_name='YOLOv4').get_log()
     checkpoint_save_dir = 'checkpoint/' + opt.exp_name
@@ -59,7 +64,9 @@ if __name__ == "__main__":
             fp_16=opt.fp_16,
             writer=writer,
             logger=logger,
-            crx_fold_num=opt.crx_valid
+            crx_fold_num=opt.crx_valid,
+            train_batch_size=opt.batch_size,
+            epochs=opt.epochs
             )
 
     trainer.train()
